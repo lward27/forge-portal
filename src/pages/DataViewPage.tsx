@@ -1,12 +1,16 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowUpDown, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, ArrowUpDown, Settings, ChevronLeft, ChevronRight, Download, X } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
+import { useToast } from '../components/ToastProvider'
 import { SlideOutPanel } from '../components/SlideOutPanel'
 import { FieldInput } from '../components/FieldInput'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { RelatedRecords } from '../components/RelatedRecords'
+import { BulkActionBar } from '../components/BulkActionBar'
+import { TableSkeleton } from '../components/Skeleton'
+import { generateCsv, downloadCsv } from '../utils/csv'
 import type { TableDef, RowData, RowListResponse, ColumnDef } from '../types'
 
 const PAGE_SIZE = 25
@@ -15,6 +19,7 @@ export function DataViewPage() {
   const { tableName } = useParams<{ tableName: string }>()
   const navigate = useNavigate()
   const { tenantId, selectedDb } = useTenant()
+  const { toast } = useToast()
 
   const [tableDef, setTableDef] = useState<TableDef | null>(null)
   const [rows, setRows] = useState<RowData[]>([])
@@ -23,7 +28,12 @@ export function DataViewPage() {
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDesc, setSortDesc] = useState(false)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // Bulk select
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [showBulkDelete, setShowBulkDelete] = useState(false)
 
   // Slide-out
   const [panelOpen, setPanelOpen] = useState(false)
@@ -33,6 +43,14 @@ export function DataViewPage() {
   const [deleteTarget, setDeleteTarget] = useState<RowData | null>(null)
 
   const basePath = `/tenants/${tenantId}/databases/${selectedDb?.id}/tables/${tableName}`
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  // Debounced search
+  useEffect(() => {
+    clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(debounceTimer.current)
+  }, [search])
 
   const loadData = useCallback(async () => {
     if (!tenantId || !selectedDb || !tableName) return
@@ -43,10 +61,11 @@ export function DataViewPage() {
 
       let url = `${basePath}/rows?limit=${PAGE_SIZE}&offset=${offset}`
       if (sortCol) url += `&sort=${sortDesc ? '-' : ''}${sortCol}`
-      if (search) {
+
+      if (debouncedSearch) {
         const textCols = tbl.columns.filter(c => c.type === 'text' && !c.primary_key)
         if (textCols.length > 0) {
-          url += `&filter=${textCols[0].name}:like:${encodeURIComponent('%' + search + '%')}`
+          url += `&filter=${textCols[0].name}:like:${encodeURIComponent('%' + debouncedSearch + '%')}`
         }
       }
 
@@ -56,10 +75,10 @@ export function DataViewPage() {
     } finally {
       setLoading(false)
     }
-  }, [tenantId, selectedDb, tableName, offset, sortCol, sortDesc, search, basePath])
+  }, [tenantId, selectedDb, tableName, offset, sortCol, sortDesc, debouncedSearch, basePath])
 
   useEffect(() => { loadData() }, [loadData])
-  useEffect(() => { setOffset(0) }, [tableName, search])
+  useEffect(() => { setOffset(0); setSelected(new Set()) }, [tableName, debouncedSearch])
 
   const writableCols = tableDef?.columns.filter(c => !c.primary_key) || []
 
@@ -89,31 +108,75 @@ export function DataViewPage() {
     try {
       if (editingRow) {
         await api.put(`${basePath}/rows/${editingRow.id}`, formData)
+        toast('Record updated', 'success')
       } else {
         await api.post(`${basePath}/rows`, formData)
+        toast('Record created', 'success')
       }
       setPanelOpen(false)
       loadData()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Failed to save')
+      const msg = err instanceof Error ? err.message : 'Failed to save'
+      setFormError(msg)
+      toast(msg, 'error')
     }
   }
 
   async function handleDelete() {
     if (!deleteTarget) return
-    await api.delete(`${basePath}/rows/${deleteTarget.id}`)
+    try {
+      await api.delete(`${basePath}/rows/${deleteTarget.id}`)
+      toast('Record deleted', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
+    }
     setDeleteTarget(null)
     setPanelOpen(false)
     loadData()
   }
 
-  function handleSort(col: string) {
-    if (sortCol === col) {
-      setSortDesc(!sortDesc)
-    } else {
-      setSortCol(col)
-      setSortDesc(false)
+  async function handleBulkDelete() {
+    try {
+      const ids = Array.from(selected)
+      const res = await api.post<{ deleted: number }>(`${basePath}/rows/bulk-delete`, { ids })
+      toast(`${res.deleted} record${res.deleted > 1 ? 's' : ''} deleted`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
     }
+    setSelected(new Set())
+    setShowBulkDelete(false)
+    loadData()
+  }
+
+  async function handleExport() {
+    try {
+      let url = `${basePath}/rows?limit=10000`
+      if (sortCol) url += `&sort=${sortDesc ? '-' : ''}${sortCol}`
+      const res = await api.get<RowListResponse>(url)
+      const colNames = tableDef?.columns.map(c => c.name) || []
+      const csv = generateCsv(colNames, res.rows)
+      downloadCsv(`${tableName}.csv`, csv)
+      toast(`Exported ${res.rows.length} records`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Export failed', 'error')
+    }
+  }
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDesc(!sortDesc)
+    else { setSortCol(col); setSortDesc(false) }
+  }
+
+  function toggleSelect(id: number) {
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelected(next)
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === rows.length) setSelected(new Set())
+    else setSelected(new Set(rows.map(r => r.id as number)))
   }
 
   function formatCell(value: unknown, col: ColumnDef): string {
@@ -123,7 +186,7 @@ export function DataViewPage() {
     return String(value)
   }
 
-  if (loading && !tableDef) return <div className="text-gray-500">Loading...</div>
+  if (loading && !tableDef) return <div className="p-4"><TableSkeleton /></div>
   if (!tableDef) return <div className="text-gray-500">Table not found</div>
 
   const columns = tableDef.columns
@@ -131,39 +194,56 @@ export function DataViewPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">{tableName}</h1>
           <button onClick={() => navigate(`/tables/${tableName}/settings`)} className="text-gray-400 hover:text-gray-600" title="Table settings">
             <Settings size={18} />
           </button>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
-          <Plus size={16} /> Add Record
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport} className="flex items-center gap-1 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            <Download size={16} /> Export
+          </button>
+          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
+            <Plus size={16} /> Add Record
+          </button>
+        </div>
       </div>
 
       {/* Search */}
-      <div className="mb-4">
+      <div className="mb-4 relative inline-block">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search..."
-          className="w-64 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
         />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X size={16} />
+          </button>
+        )}
+        {search !== debouncedSearch && <span className="ml-2 text-xs text-gray-400">Searching...</span>}
       </div>
 
+      {/* Bulk action bar */}
+      <BulkActionBar count={selected.size} onDelete={() => setShowBulkDelete(true)} onClear={() => setSelected(new Set())} />
+
       {/* Table */}
-      {rows.length === 0 ? (
+      {loading ? <TableSkeleton cols={columns.length} /> : rows.length === 0 ? (
         <div className="text-center py-12 text-gray-500 bg-white rounded-lg border border-gray-200">
-          {search ? 'No matching records found.' : "No records yet. Click 'Add Record' to create your first one."}
+          {debouncedSearch ? 'No matching records found.' : "No records yet. Click 'Add Record' to create your first one."}
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="px-3 py-3 w-10">
+                  <input type="checkbox" checked={selected.size === rows.length && rows.length > 0} onChange={toggleSelectAll} className="rounded" />
+                </th>
                 {columns.map(col => (
                   <th key={col.name} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onClick={() => handleSort(col.name)}>
                     <span className="flex items-center gap-1">
@@ -176,9 +256,12 @@ export function DataViewPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {rows.map((row, i) => (
-                <tr key={i} onClick={() => openEdit(row)} className="cursor-pointer hover:bg-gray-50">
+                <tr key={i} className={`hover:bg-gray-50 ${selected.has(row.id as number) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-3 py-3">
+                    <input type="checkbox" checked={selected.has(row.id as number)} onChange={() => toggleSelect(row.id as number)} className="rounded" />
+                  </td>
                   {columns.map(col => (
-                    <td key={col.name} className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap max-w-xs truncate">
+                    <td key={col.name} onClick={() => openEdit(row)} className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap max-w-xs truncate cursor-pointer">
                       {formatCell(row[col.name], col)}
                     </td>
                   ))}
@@ -195,13 +278,9 @@ export function DataViewPage() {
           <span>Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}</span>
           <div className="flex gap-2">
             <button onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} disabled={offset === 0}
-              className="px-3 py-1 border rounded-md disabled:opacity-30 hover:bg-gray-100">
-              <ChevronLeft size={16} />
-            </button>
+              className="px-3 py-1 border rounded-md disabled:opacity-30 hover:bg-gray-100"><ChevronLeft size={16} /></button>
             <button onClick={() => setOffset(offset + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= total}
-              className="px-3 py-1 border rounded-md disabled:opacity-30 hover:bg-gray-100">
-              <ChevronRight size={16} />
-            </button>
+              className="px-3 py-1 border rounded-md disabled:opacity-30 hover:bg-gray-100"><ChevronRight size={16} /></button>
           </div>
         </div>
       )}
@@ -216,14 +295,10 @@ export function DataViewPage() {
             </div>
           )}
           {writableCols.map(col => (
-            <FieldInput
-              key={col.name}
-              column={col}
-              value={formData[col.name]}
-              onChange={(val) => setFormData(prev => ({ ...prev, [col.name]: val }))}
-            />
+            <FieldInput key={col.name} column={col} value={formData[col.name]}
+              onChange={(val) => setFormData(prev => ({ ...prev, [col.name]: val }))} />
           ))}
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
+          {formError && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-md">{formError}</p>}
         </div>
         {editingRow && tableName && (
           <RelatedRecords tableName={tableName} rowId={editingRow.id as number} />
@@ -241,6 +316,10 @@ export function DataViewPage() {
 
       <ConfirmDialog open={!!deleteTarget} title="Delete Record" message={`Delete record #${deleteTarget?.id}? This cannot be undone.`}
         confirmLabel="Delete" destructive onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} />
+
+      <ConfirmDialog open={showBulkDelete} title="Delete Records"
+        message={`Delete ${selected.size} selected record${selected.size > 1 ? 's' : ''}? This cannot be undone.`}
+        confirmLabel={`Delete ${selected.size}`} destructive onConfirm={handleBulkDelete} onCancel={() => setShowBulkDelete(false)} />
     </div>
   )
 }

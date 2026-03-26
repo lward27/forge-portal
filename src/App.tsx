@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { TenantProvider, useTenant } from './context/TenantContext'
+import { ToastProvider } from './components/ToastProvider'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/Layout'
 import { Modal } from './components/Modal'
 import { LoginPage } from './pages/LoginPage'
@@ -135,17 +137,21 @@ export default function App() {
   if (isAuthenticated === null) return null
 
   return (
-    <BrowserRouter>
-      {!isAuthenticated ? (
-        <Routes>
-          <Route path="/login" element={<LoginPage onLogin={login} />} />
-          <Route path="*" element={<Navigate to="/login" />} />
-        </Routes>
-      ) : (
-        <TenantProvider>
-          <PortalRoutes />
-        </TenantProvider>
-      )}
-    </BrowserRouter>
+    <ToastProvider>
+      <ErrorBoundary>
+        <BrowserRouter>
+          {!isAuthenticated ? (
+            <Routes>
+              <Route path="/login" element={<LoginPage onLogin={login} />} />
+              <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
+          ) : (
+            <TenantProvider>
+              <PortalRoutes />
+            </TenantProvider>
+          )}
+        </BrowserRouter>
+      </ErrorBoundary>
+    </ToastProvider>
   )
 }
