@@ -1,3 +1,4 @@
+import { ReferenceSelect } from './ReferenceSelect'
 import type { ColumnDef } from '../types'
 
 interface Props {
@@ -26,6 +27,18 @@ export function FieldInput({ column, value, onChange, error }: Props) {
 
   let input
   switch (column.type) {
+    case 'reference':
+      input = column.reference_table ? (
+        <ReferenceSelect
+          referenceTable={column.reference_table}
+          value={value}
+          onChange={onChange}
+          nullable={column.nullable}
+        />
+      ) : (
+        <p className="text-sm text-gray-400">No reference table configured</p>
+      )
+      break
     case 'boolean':
       input = (
         <button

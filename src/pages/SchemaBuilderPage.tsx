@@ -16,11 +16,14 @@ export function SchemaBuilderPage() {
   const [tableDef, setTableDef] = useState<TableDef | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [allTables, setAllTables] = useState<TableDef[]>([])
+
   // Add field form
   const [newFieldName, setNewFieldName] = useState('')
   const [newFieldType, setNewFieldType] = useState('text')
   const [newFieldRequired, setNewFieldRequired] = useState(false)
   const [newFieldUnique, setNewFieldUnique] = useState(false)
+  const [newFieldRefTable, setNewFieldRefTable] = useState('')
   const [addError, setAddError] = useState('')
 
   // Delete field
@@ -39,8 +42,12 @@ export function SchemaBuilderPage() {
     if (!tenantId || !selectedDb || !tableName) return
     setLoading(true)
     try {
-      const tbl = await api.get<TableDef>(basePath)
+      const [tbl, tablesRes] = await Promise.all([
+        api.get<TableDef>(basePath),
+        api.get<{ tables: TableDef[] }>(`/tenants/${tenantId}/databases/${selectedDb.id}/tables`),
+      ])
       setTableDef(tbl)
+      setAllTables(tablesRes.tables)
     } finally {
       setLoading(false)
     }
@@ -50,18 +57,21 @@ export function SchemaBuilderPage() {
     e.preventDefault()
     setAddError('')
     try {
-      await api.put<TableDef>(basePath, {
-        add_columns: [{
-          name: newFieldName,
-          type: newFieldType,
-          nullable: !newFieldRequired,
-          unique: newFieldUnique,
-        }],
-      })
+      const col: Record<string, unknown> = {
+        name: newFieldName,
+        type: newFieldType,
+        nullable: !newFieldRequired,
+        unique: newFieldUnique,
+      }
+      if (newFieldType === 'reference') {
+        col.reference_table = newFieldRefTable
+      }
+      await api.put<TableDef>(basePath, { add_columns: [col] })
       setNewFieldName('')
       setNewFieldType('text')
       setNewFieldRequired(false)
       setNewFieldUnique(false)
+      setNewFieldRefTable('')
       loadTable()
     } catch (err) {
       setAddError(err instanceof Error ? err.message : 'Failed')
@@ -104,6 +114,7 @@ export function SchemaBuilderPage() {
               <div className="flex items-center gap-3">
                 <span className="font-medium text-gray-900 text-sm">{col.name}</span>
                 <TypeBadge type={col.type} />
+                {col.reference_table && <span className="text-xs text-indigo-600">→ {col.reference_table}</span>}
                 {!col.nullable && <span className="text-xs text-orange-600">Required</span>}
                 {col.unique && <span className="text-xs text-purple-600">Unique</span>}
               </div>
@@ -137,16 +148,33 @@ export function SchemaBuilderPage() {
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-6 mb-4">
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={newFieldRequired} onChange={(e) => setNewFieldRequired(e.target.checked)} className="rounded" />
-              Required
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={newFieldUnique} onChange={(e) => setNewFieldUnique(e.target.checked)} className="rounded" />
-              Unique
-            </label>
-          </div>
+          {newFieldType === 'reference' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">References Table</label>
+              <select value={newFieldRefTable} onChange={(e) => {
+                setNewFieldRefTable(e.target.value)
+                if (!newFieldName && e.target.value) setNewFieldName(`${e.target.value}_id`)
+              }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                <option value="">Select a table...</option>
+                {allTables.filter(t => t.name !== tableName).map(t => (
+                  <option key={t.name} value={t.name}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {newFieldType !== 'reference' && (
+            <div className="flex items-center gap-6 mb-4">
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={newFieldRequired} onChange={(e) => setNewFieldRequired(e.target.checked)} className="rounded" />
+                Required
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={newFieldUnique} onChange={(e) => setNewFieldUnique(e.target.checked)} className="rounded" />
+                Unique
+              </label>
+            </div>
+          )}
           {addError && <p className="text-red-600 text-sm mb-3">{addError}</p>}
           <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">
             <Plus size={16} /> Add Field

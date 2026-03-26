@@ -22,6 +22,7 @@ export interface ColumnDef {
   primary_key: boolean
   unique: boolean
   default: string | null
+  reference_table?: string | null
 }
 
 export interface TableDef {
@@ -52,8 +53,9 @@ export const TYPE_LABELS: Record<string, string> = {
   timestamp: 'Date & Time',
   json: 'JSON',
   serial: 'Auto ID',
+  reference: 'Reference',
 }
 
 export const FIELD_TYPES = [
-  'text', 'integer', 'decimal', 'boolean', 'date', 'timestamp', 'json',
+  'text', 'integer', 'decimal', 'boolean', 'date', 'timestamp', 'json', 'reference',
 ]

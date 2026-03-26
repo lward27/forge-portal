@@ -6,6 +6,7 @@ import { useTenant } from '../context/TenantContext'
 import { SlideOutPanel } from '../components/SlideOutPanel'
 import { FieldInput } from '../components/FieldInput'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { RelatedRecords } from '../components/RelatedRecords'
 import type { TableDef, RowData, RowListResponse, ColumnDef } from '../types'
 
 const PAGE_SIZE = 25
@@ -224,6 +225,9 @@ export function DataViewPage() {
           ))}
           {formError && <p className="text-red-600 text-sm">{formError}</p>}
         </div>
+        {editingRow && tableName && (
+          <RelatedRecords tableName={tableName} rowId={editingRow.id as number} />
+        )}
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
           {editingRow ? (
             <button onClick={() => setDeleteTarget(editingRow)} className="text-sm text-red-600 hover:text-red-700">Delete</button>

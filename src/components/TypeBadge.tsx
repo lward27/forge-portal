@@ -10,6 +10,7 @@ const TYPE_COLORS: Record<string, string> = {
   timestamp: 'bg-orange-100 text-orange-800',
   json: 'bg-gray-100 text-gray-800',
   serial: 'bg-gray-100 text-gray-600',
+  reference: 'bg-indigo-100 text-indigo-800',
 }
 
 export function TypeBadge({ type }: { type: string }) {
