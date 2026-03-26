@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, Trash2, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
@@ -10,6 +10,7 @@ import { SlideOutPanel } from '../components/SlideOutPanel'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import { FormCustomizer } from '../components/FormCustomizer'
+import { FormPicker } from '../components/FormPicker'
 import type { TableDef, RowData, ColumnDef, FormDef } from '../types'
 
 interface RelatedGroup {
@@ -21,6 +22,7 @@ interface RelatedGroup {
 
 export function RecordDetailPage() {
   const { tableName, recordId } = useParams<{ tableName: string; recordId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { tenantId, selectedDb } = useTenant()
   const { toast } = useToast()
@@ -34,8 +36,10 @@ export function RecordDetailPage() {
   const [showDelete, setShowDelete] = useState(false)
 
   // Form config
+  const [allForms, setAllForms] = useState<FormDef[]>([])
   const [formDef, setFormDef] = useState<FormDef | null>(null)
   const [showFormCustomizer, setShowFormCustomizer] = useState(false)
+  const [deleteFormTarget, setDeleteFormTarget] = useState<FormDef | null>(null)
 
   // Add child slide-out
   const [addChildTable, setAddChildTable] = useState<{ table: string; column: string } | null>(null)
@@ -56,10 +60,15 @@ export function RecordDetailPage() {
         api.get<TableDef>(basePath),
         api.get<RowData>(`${basePath}/rows/${recordId}`),
         api.get<{ related: RelatedGroup[] }>(`${basePath}/rows/${recordId}/related`),
-        api.get<{ forms: FormDef[] }>(`${basePath}/forms?default=true`).catch(() => ({ forms: [] })),
+        api.get<{ forms: FormDef[] }>(`${basePath}/forms`).catch(() => ({ forms: [] })),
       ])
       setTableDef(tbl)
-      if (formsRes.forms.length > 0) setFormDef(formsRes.forms[0])
+      setAllForms(formsRes.forms)
+      const formParam = searchParams.get('form')
+      const selectedForm = formParam
+        ? formsRes.forms.find(f => f.id === formParam)
+        : formsRes.forms.find(f => f.is_default)
+      if (selectedForm) setFormDef(selectedForm)
 
       const data: Record<string, unknown> = {}
       tbl.columns.filter(c => !c.primary_key).forEach(c => {
@@ -160,7 +169,18 @@ export function RecordDetailPage() {
           <button onClick={() => navigate(`/tables/${tableName}`)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2">
             <ArrowLeft size={16} /> Back to {tableName}
           </button>
-          <h1 className="text-xl font-bold text-gray-900">Record #{recordId}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-gray-900">Record #{recordId}</h1>
+            <FormPicker
+              forms={allForms}
+              selected={formDef}
+              onSelect={(f) => {
+                setFormDef(f)
+                setSearchParams(f.is_default ? {} : { form: f.id })
+              }}
+              onDelete={(f) => setDeleteFormTarget(f)}
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {formDef && (
@@ -255,8 +275,39 @@ export function RecordDetailPage() {
               toast(err instanceof Error ? err.message : 'Failed to save form', 'error')
             }
           }}
+          onSaveAsNew={async (name, newConfig) => {
+            try {
+              const res = await api.post<FormDef>(`${basePath}/forms`, { name, config: newConfig })
+              toast(`Form "${name}" created`, 'success')
+              setSearchParams({ form: res.id })
+              loadRecord()
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Failed to create form', 'error')
+            }
+          }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteFormTarget}
+        title="Delete Form"
+        message={`Delete form "${deleteFormTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          if (!deleteFormTarget) return
+          try {
+            await api.delete(`${basePath}/forms/${deleteFormTarget.id}`)
+            toast('Form deleted', 'success')
+            setDeleteFormTarget(null)
+            if (formDef?.id === deleteFormTarget.id) setSearchParams({})
+            loadRecord()
+          } catch (err) {
+            toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
+          }
+        }}
+        onCancel={() => setDeleteFormTarget(null)}
+      />
     </div>
   )
 }

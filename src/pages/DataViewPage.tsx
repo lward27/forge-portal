@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, ArrowUpDown, Settings, ChevronLeft, ChevronRight, Download, X, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
@@ -11,6 +11,8 @@ import { RelatedRecords } from '../components/RelatedRecords'
 import { BulkActionBar } from '../components/BulkActionBar'
 import { TableSkeleton } from '../components/Skeleton'
 import { ViewCustomizer } from '../components/ViewCustomizer'
+import { ViewPicker } from '../components/ViewPicker'
+import { ConfirmDialog as ViewDeleteConfirm } from '../components/ConfirmDialog'
 import { generateCsv, downloadCsv } from '../utils/csv'
 import type { TableDef, RowData, RowListResponse, ColumnDef, ViewDef, ViewConfig } from '../types'
 
@@ -18,6 +20,7 @@ const DEFAULT_PAGE_SIZE = 25
 
 export function DataViewPage() {
   const { tableName } = useParams<{ tableName: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { tenantId, selectedDb } = useTenant()
   const { toast } = useToast()
@@ -33,8 +36,10 @@ export function DataViewPage() {
   const [loading, setLoading] = useState(true)
 
   // View config
+  const [allViews, setAllViews] = useState<ViewDef[]>([])
   const [viewDef, setViewDef] = useState<ViewDef | null>(null)
   const [showViewCustomizer, setShowViewCustomizer] = useState(false)
+  const [deleteViewTarget, setDeleteViewTarget] = useState<ViewDef | null>(null)
 
   // Bulk select
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -65,12 +70,19 @@ export function DataViewPage() {
     try {
       const [tbl, viewsRes] = await Promise.all([
         api.get<TableDef>(`${basePath}`),
-        api.get<{ views: ViewDef[] }>(`${basePath}/views?default=true`).catch(() => ({ views: [] })),
+        api.get<{ views: ViewDef[] }>(`${basePath}/views`).catch(() => ({ views: [] })),
       ])
       setTableDef(tbl)
-      if (viewsRes.views.length > 0) setViewDef(viewsRes.views[0])
+      setAllViews(viewsRes.views)
 
-      const ps = viewsRes.views[0]?.config?.page_size || DEFAULT_PAGE_SIZE
+      // Select view from URL param or default
+      const viewParam = searchParams.get('view')
+      const selectedView = viewParam
+        ? viewsRes.views.find(v => v.id === viewParam)
+        : viewsRes.views.find(v => v.is_default)
+      if (selectedView) setViewDef(selectedView)
+
+      const ps = selectedView?.config?.page_size || DEFAULT_PAGE_SIZE
       let url = `${basePath}/rows?limit=${ps}&offset=${offset}`
       if (sortCol) url += `&sort=${sortDesc ? '-' : ''}${sortCol}`
 
@@ -250,6 +262,15 @@ export function DataViewPage() {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">{tableName}</h1>
+          <ViewPicker
+            views={allViews}
+            selected={viewDef}
+            onSelect={(v) => {
+              setViewDef(v)
+              setSearchParams(v.is_default ? {} : { view: v.id })
+            }}
+            onDelete={(v) => setDeleteViewTarget(v)}
+          />
           <button onClick={() => navigate(`/tables/${tableName}/settings`)} className="text-gray-400 hover:text-gray-600" title="Table settings">
             <Settings size={18} />
           </button>
@@ -394,8 +415,41 @@ export function DataViewPage() {
               toast(err instanceof Error ? err.message : 'Failed to save view', 'error')
             }
           }}
+          onSaveAsNew={async (name, newConfig) => {
+            try {
+              const res = await api.post<ViewDef>(`${basePath}/views`, { name, config: newConfig })
+              toast(`View "${name}" created`, 'success')
+              setSearchParams({ view: res.id })
+              loadData()
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Failed to create view', 'error')
+            }
+          }}
         />
       )}
+
+      <ViewDeleteConfirm
+        open={!!deleteViewTarget}
+        title="Delete View"
+        message={`Delete view "${deleteViewTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          if (!deleteViewTarget) return
+          try {
+            await api.delete(`${basePath}/views/${deleteViewTarget.id}`)
+            toast('View deleted', 'success')
+            setDeleteViewTarget(null)
+            if (viewDef?.id === deleteViewTarget.id) {
+              setSearchParams({})
+            }
+            loadData()
+          } catch (err) {
+            toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
+          }
+        }}
+        onCancel={() => setDeleteViewTarget(null)}
+      />
     </div>
   )
 }

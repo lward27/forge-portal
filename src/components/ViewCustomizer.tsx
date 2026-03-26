@@ -8,9 +8,12 @@ interface Props {
   onClose: () => void
   config: ViewConfig
   onSave: (config: ViewConfig) => void
+  onSaveAsNew?: (name: string, config: ViewConfig) => void
 }
 
-export function ViewCustomizer({ open, onClose, config, onSave }: Props) {
+export function ViewCustomizer({ open, onClose, config, onSave, onSaveAsNew }: Props) {
+  const [newViewName, setNewViewName] = useState('')
+  const [showSaveAs, setShowSaveAs] = useState(false)
   const [columns, setColumns] = useState<ViewColumnConfig[]>([...config.columns])
   const [sortField, setSortField] = useState(config.default_sort.field)
   const [sortDir, setSortDir] = useState(config.default_sort.direction)
@@ -99,9 +102,31 @@ export function ViewCustomizer({ open, onClose, config, onSave }: Props) {
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
-        <button onClick={handleSave} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">Save View</button>
+      <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
+        {onSaveAsNew && !showSaveAs && (
+          <button onClick={() => setShowSaveAs(true)} className="text-sm text-blue-600 hover:text-blue-700">
+            Save as New View...
+          </button>
+        )}
+        {showSaveAs && (
+          <div className="flex gap-2">
+            <input value={newViewName} onChange={(e) => setNewViewName(e.target.value)} placeholder="View name..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm" autoFocus />
+            <button onClick={() => {
+              if (newViewName.trim()) {
+                const cfg = { columns, default_sort: { field: sortField, direction: sortDir }, page_size: pageSize }
+                onSaveAsNew?.(newViewName.trim(), cfg)
+                setNewViewName('')
+                setShowSaveAs(false)
+                onClose()
+              }
+            }} className="px-3 py-2 text-sm text-white bg-green-600 rounded-md hover:bg-green-700">Save</button>
+          </div>
+        )}
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+          <button onClick={handleSave} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">Save View</button>
+        </div>
       </div>
     </SlideOutPanel>
   )
