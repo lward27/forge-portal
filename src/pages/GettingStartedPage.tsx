@@ -1,15 +1,25 @@
-import { useState } from 'react'
-import { Database, Table2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Database, Table2, LayoutDashboard } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 import { EmptyState } from '../components/EmptyState'
 import { Modal } from '../components/Modal'
+import type { TableDef } from '../types'
 
 export function GettingStartedPage() {
   const { tenantId, databases, selectedDb, refreshDatabases } = useTenant()
   const [showCreateDb, setShowCreateDb] = useState(false)
   const [dbName, setDbName] = useState('')
   const [error, setError] = useState('')
+  const [tableCount, setTableCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (tenantId && selectedDb) {
+      api.get<{ tables: TableDef[] }>(`/tenants/${tenantId}/databases/${selectedDb.id}/tables`)
+        .then(res => setTableCount(res.tables.length))
+        .catch(() => setTableCount(0))
+    }
+  }, [tenantId, selectedDb])
 
   async function handleCreateDb(e: React.FormEvent) {
     e.preventDefault()
@@ -24,6 +34,7 @@ export function GettingStartedPage() {
     }
   }
 
+  // No databases yet
   if (databases.length === 0) {
     return (
       <>
@@ -53,16 +64,29 @@ export function GettingStartedPage() {
     )
   }
 
-  if (selectedDb) {
+  // Database selected but no tables
+  if (selectedDb && tableCount === 0) {
     return (
       <EmptyState
         icon={<Table2 size={48} />}
         title="No tables yet"
-        description="Create your first table to start organizing your data."
+        description="Create your first table using the 'New Table' button in the sidebar to start organizing your data."
       />
     )
   }
 
+  // Tables exist, none selected — this is the normal "home" state
+  if (selectedDb && tableCount !== null && tableCount > 0) {
+    return (
+      <EmptyState
+        icon={<LayoutDashboard size={48} />}
+        title="Select a table"
+        description="Choose a table from the sidebar to view and manage its records."
+      />
+    )
+  }
+
+  // No database selected (multiple databases, none picked)
   return (
     <EmptyState
       icon={<Database size={48} />}
