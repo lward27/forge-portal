@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 import { useToast } from '../components/ToastProvider'
@@ -9,7 +9,8 @@ import { RelatedTable } from '../components/RelatedTable'
 import { SlideOutPanel } from '../components/SlideOutPanel'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
-import type { TableDef, RowData, ColumnDef } from '../types'
+import { FormCustomizer } from '../components/FormCustomizer'
+import type { TableDef, RowData, ColumnDef, FormDef } from '../types'
 
 interface RelatedGroup {
   table: string
@@ -32,6 +33,10 @@ export function RecordDetailPage() {
   const [formError, setFormError] = useState('')
   const [showDelete, setShowDelete] = useState(false)
 
+  // Form config
+  const [formDef, setFormDef] = useState<FormDef | null>(null)
+  const [showFormCustomizer, setShowFormCustomizer] = useState(false)
+
   // Add child slide-out
   const [addChildTable, setAddChildTable] = useState<{ table: string; column: string } | null>(null)
   const [childFormData, setChildFormData] = useState<Record<string, unknown>>({})
@@ -47,12 +52,14 @@ export function RecordDetailPage() {
     if (!tenantId || !selectedDb || !tableName || !recordId) return
     setLoading(true)
     try {
-      const [tbl, row, relRes] = await Promise.all([
+      const [tbl, row, relRes, formsRes] = await Promise.all([
         api.get<TableDef>(basePath),
         api.get<RowData>(`${basePath}/rows/${recordId}`),
         api.get<{ related: RelatedGroup[] }>(`${basePath}/rows/${recordId}/related`),
+        api.get<{ forms: FormDef[] }>(`${basePath}/forms?default=true`).catch(() => ({ forms: [] })),
       ])
       setTableDef(tbl)
+      if (formsRes.forms.length > 0) setFormDef(formsRes.forms[0])
 
       const data: Record<string, unknown> = {}
       tbl.columns.filter(c => !c.primary_key).forEach(c => {
@@ -124,7 +131,25 @@ export function RecordDetailPage() {
   if (loading) return <div className="max-w-3xl mx-auto space-y-4"><CardSkeleton /><CardSkeleton /></div>
   if (!tableDef) return <div className="text-gray-500">Not found</div>
 
-  const writableCols = tableDef.columns.filter(c => !c.primary_key)
+  // Apply form config: filter and order visible fields
+  const formFields = formDef?.config?.sections?.[0]?.fields
+  let writableCols = tableDef.columns.filter(c => !c.primary_key)
+  if (formFields) {
+    const visibleFields = new Set(formFields.filter(f => f.visible).map(f => f.field))
+    const ordered = formFields.filter(f => f.visible).map(f => tableDef.columns.find(c => c.name === f.field)).filter(Boolean) as ColumnDef[]
+    const inConfig = new Set(formFields.map(f => f.field))
+    const extra = tableDef.columns.filter(c => !c.primary_key && !inConfig.has(c.name))
+    writableCols = [...ordered, ...extra]
+  }
+
+  // Apply form config: filter visible related tables
+  const formRelated = formDef?.config?.related_tables
+  const visibleRelated = formRelated
+    ? related.filter(r => {
+        const cfg = formRelated.find(fr => fr.table === r.table && fr.reference_column === r.column)
+        return !cfg || cfg.visible
+      })
+    : related
   const childWritableCols = childTableDef?.columns.filter((c: ColumnDef) => !c.primary_key) || []
 
   return (
@@ -138,6 +163,11 @@ export function RecordDetailPage() {
           <h1 className="text-xl font-bold text-gray-900">Record #{recordId}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {formDef && (
+            <button onClick={() => setShowFormCustomizer(true)} className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50" title="Customize Form">
+              <SlidersHorizontal size={16} />
+            </button>
+          )}
           <button onClick={() => setShowDelete(true)} className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 bg-white border border-red-200 rounded-md hover:bg-red-50">
             <Trash2 size={16} /> Delete
           </button>
@@ -167,10 +197,10 @@ export function RecordDetailPage() {
       </div>
 
       {/* Related records */}
-      {related.length > 0 && (
+      {visibleRelated.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Related Records</h2>
-          {related.map(group => (
+          {visibleRelated.map(group => (
             <RelatedTable
               key={`${group.table}-${group.column}`}
               tableName={group.table}
@@ -209,6 +239,24 @@ export function RecordDetailPage() {
           <button onClick={handleSaveChild} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">Save</button>
         </div>
       </SlideOutPanel>
+
+      {/* Form Customizer */}
+      {formDef && (
+        <FormCustomizer
+          open={showFormCustomizer}
+          onClose={() => setShowFormCustomizer(false)}
+          config={formDef.config}
+          onSave={async (newConfig) => {
+            try {
+              await api.put(`${basePath}/forms/${formDef.id}`, { config: newConfig })
+              toast('Form saved', 'success')
+              loadRecord()
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Failed to save form', 'error')
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowUpDown, Settings, ChevronLeft, ChevronRight, Download, X } from 'lucide-react'
+import { Plus, ArrowUpDown, Settings, ChevronLeft, ChevronRight, Download, X, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 import { useToast } from '../components/ToastProvider'
@@ -10,10 +10,11 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { RelatedRecords } from '../components/RelatedRecords'
 import { BulkActionBar } from '../components/BulkActionBar'
 import { TableSkeleton } from '../components/Skeleton'
+import { ViewCustomizer } from '../components/ViewCustomizer'
 import { generateCsv, downloadCsv } from '../utils/csv'
-import type { TableDef, RowData, RowListResponse, ColumnDef } from '../types'
+import type { TableDef, RowData, RowListResponse, ColumnDef, ViewDef, ViewConfig } from '../types'
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 export function DataViewPage() {
   const { tableName } = useParams<{ tableName: string }>()
@@ -30,6 +31,10 @@ export function DataViewPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // View config
+  const [viewDef, setViewDef] = useState<ViewDef | null>(null)
+  const [showViewCustomizer, setShowViewCustomizer] = useState(false)
 
   // Bulk select
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -52,14 +57,21 @@ export function DataViewPage() {
     return () => clearTimeout(debounceTimer.current)
   }, [search])
 
+  const pageSize = viewDef?.config?.page_size || DEFAULT_PAGE_SIZE
+
   const loadData = useCallback(async () => {
     if (!tenantId || !selectedDb || !tableName) return
     setLoading(true)
     try {
-      const tbl = await api.get<TableDef>(`${basePath}`)
+      const [tbl, viewsRes] = await Promise.all([
+        api.get<TableDef>(`${basePath}`),
+        api.get<{ views: ViewDef[] }>(`${basePath}/views?default=true`).catch(() => ({ views: [] })),
+      ])
       setTableDef(tbl)
+      if (viewsRes.views.length > 0) setViewDef(viewsRes.views[0])
 
-      let url = `${basePath}/rows?limit=${PAGE_SIZE}&offset=${offset}`
+      const ps = viewsRes.views[0]?.config?.page_size || DEFAULT_PAGE_SIZE
+      let url = `${basePath}/rows?limit=${ps}&offset=${offset}`
       if (sortCol) url += `&sort=${sortDesc ? '-' : ''}${sortCol}`
 
       if (debouncedSearch) {
@@ -197,7 +209,17 @@ export function DataViewPage() {
   if (loading && !tableDef) return <div className="p-4"><TableSkeleton /></div>
   if (!tableDef) return <div className="text-gray-500">Table not found</div>
 
-  const columns = tableDef.columns
+  // Apply view config: filter visible columns and respect order
+  const viewColOrder = viewDef?.config?.columns
+  let columns = tableDef.columns
+  if (viewColOrder) {
+    const visibleFields = new Set(viewColOrder.filter(c => c.visible).map(c => c.field))
+    const ordered = viewColOrder.filter(c => c.visible).map(c => tableDef.columns.find(tc => tc.name === c.field)).filter(Boolean) as ColumnDef[]
+    // Add any columns not in the view config (newly added)
+    const inConfig = new Set(viewColOrder.map(c => c.field))
+    const extra = tableDef.columns.filter(c => !inConfig.has(c.name))
+    columns = [...ordered, ...extra]
+  }
 
   return (
     <div>
@@ -210,6 +232,11 @@ export function DataViewPage() {
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {viewDef && (
+            <button onClick={() => setShowViewCustomizer(true)} className="flex items-center gap-1 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50" title="Customize View">
+              <SlidersHorizontal size={16} />
+            </button>
+          )}
           <button onClick={handleExport} className="flex items-center gap-1 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
             <Download size={16} /> Export
           </button>
@@ -281,13 +308,13 @@ export function DataViewPage() {
       )}
 
       {/* Pagination */}
-      {total > PAGE_SIZE && (
+      {total > pageSize && (
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-          <span>Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}</span>
+          <span>Showing {offset + 1}–{Math.min(offset + pageSize, total)} of {total}</span>
           <div className="flex gap-2">
-            <button onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} disabled={offset === 0}
+            <button onClick={() => setOffset(Math.max(0, offset - pageSize))} disabled={offset === 0}
               className="px-3 py-1 border rounded-md disabled:opacity-30 hover:bg-gray-100"><ChevronLeft size={16} /></button>
-            <button onClick={() => setOffset(offset + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= total}
+            <button onClick={() => setOffset(offset + pageSize)} disabled={offset + pageSize >= total}
               className="px-3 py-1 border rounded-md disabled:opacity-30 hover:bg-gray-100"><ChevronRight size={16} /></button>
           </div>
         </div>
@@ -328,6 +355,24 @@ export function DataViewPage() {
       <ConfirmDialog open={showBulkDelete} title="Delete Records"
         message={`Delete ${selected.size} selected record${selected.size > 1 ? 's' : ''}? This cannot be undone.`}
         confirmLabel={`Delete ${selected.size}`} destructive onConfirm={handleBulkDelete} onCancel={() => setShowBulkDelete(false)} />
+
+      {/* View Customizer */}
+      {viewDef && (
+        <ViewCustomizer
+          open={showViewCustomizer}
+          onClose={() => setShowViewCustomizer(false)}
+          config={viewDef.config}
+          onSave={async (newConfig) => {
+            try {
+              await api.put(`${basePath}/views/${viewDef.id}`, { config: newConfig })
+              toast('View saved', 'success')
+              loadData()
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Failed to save view', 'error')
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
