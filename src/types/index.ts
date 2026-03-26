@@ -27,6 +27,7 @@ export interface ColumnDef {
 
 export interface TableDef {
   name: string
+  display_field?: string | null
   database_id: string
   columns: ColumnDef[]
   created_at: string

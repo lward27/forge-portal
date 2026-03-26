@@ -10,6 +10,7 @@ import { LoginPage } from './pages/LoginPage'
 import { GettingStartedPage } from './pages/GettingStartedPage'
 import { DataViewPage } from './pages/DataViewPage'
 import { SchemaBuilderPage } from './pages/SchemaBuilderPage'
+import { RecordDetailPage } from './pages/RecordDetailPage'
 import { api } from './api/client'
 import { FIELD_TYPES, TYPE_LABELS } from './types'
 
@@ -77,6 +78,7 @@ function PortalRoutes() {
           <Route path="/" element={<GettingStartedPage />} />
           <Route path="/tables/:tableName" element={<DataViewPage />} />
           <Route path="/tables/:tableName/settings" element={<SchemaBuilderPage />} />
+          <Route path="/tables/:tableName/records/:recordId" element={<RecordDetailPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

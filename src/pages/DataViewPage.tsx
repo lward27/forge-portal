@@ -179,7 +179,15 @@ export function DataViewPage() {
     else setSelected(new Set(rows.map(r => r.id as number)))
   }
 
-  function formatCell(value: unknown, col: ColumnDef): string {
+  function formatCell(row: RowData, col: ColumnDef): string {
+    // For reference columns, show the __display value if available
+    if (col.type === 'reference') {
+      const display = row[`${col.name}__display`]
+      if (display != null) return String(display)
+      const val = row[col.name]
+      return val != null ? `#${val}` : ''
+    }
+    const value = row[col.name]
     if (value === null || value === undefined) return ''
     if (col.type === 'boolean') return value ? 'Yes' : 'No'
     if (col.type === 'decimal') return Number(value).toFixed(2)
@@ -261,8 +269,8 @@ export function DataViewPage() {
                     <input type="checkbox" checked={selected.has(row.id as number)} onChange={() => toggleSelect(row.id as number)} className="rounded" />
                   </td>
                   {columns.map(col => (
-                    <td key={col.name} onClick={() => openEdit(row)} className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap max-w-xs truncate cursor-pointer">
-                      {formatCell(row[col.name], col)}
+                    <td key={col.name} onClick={() => navigate(`/tables/${tableName}/records/${row.id}`)} className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap max-w-xs truncate cursor-pointer">
+                      {formatCell(row, col)}
                     </td>
                   ))}
                 </tr>

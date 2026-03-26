@@ -105,6 +105,25 @@ export function SchemaBuilderPage() {
 
       <h1 className="text-xl font-bold text-gray-900 mb-6">Table Settings — {tableName}</h1>
 
+      {/* Display field */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Display Field</label>
+        <p className="text-xs text-gray-400 mb-2">The field used to represent this table's records in dropdowns and references.</p>
+        <select
+          value={tableDef.display_field || ''}
+          onChange={async (e) => {
+            await api.put(basePath, { display_field: e.target.value })
+            loadTable()
+          }}
+          className="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Auto (first text field)</option>
+          {tableDef.columns.filter(c => c.type === 'text').map(c => (
+            <option key={c.name} value={c.name}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Fields list */}
       <div className="mb-8">
         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Fields</h2>
