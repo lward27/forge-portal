@@ -90,7 +90,30 @@ export function DataViewPage() {
   }, [tenantId, selectedDb, tableName, offset, sortCol, sortDesc, debouncedSearch, basePath])
 
   useEffect(() => { loadData() }, [loadData])
-  useEffect(() => { setOffset(0); setSelected(new Set()) }, [tableName, debouncedSearch])
+
+  // Reset all state when switching tables
+  useEffect(() => {
+    setOffset(0)
+    setSelected(new Set())
+    setViewDef(null)
+    setSortCol(null)
+    setSortDesc(false)
+    setSearch('')
+    setDebouncedSearch('')
+  }, [tableName])
+
+  // Apply view's default sort once loaded (only if user hasn't manually sorted)
+  useEffect(() => {
+    if (viewDef && !sortCol) {
+      const ds = viewDef.config?.default_sort
+      if (ds) {
+        setSortCol(ds.field)
+        setSortDesc(ds.direction === 'desc')
+      }
+    }
+  }, [viewDef?.id]) // only when a new view loads
+
+  useEffect(() => { setOffset(0) }, [debouncedSearch])
 
   const writableCols = tableDef?.columns.filter(c => !c.primary_key) || []
 

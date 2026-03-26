@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
-import type { RowData } from '../types'
+import { api } from '../api/client'
+import { useTenant } from '../context/TenantContext'
+import type { RowData, ViewDef } from '../types'
 
 interface Props {
   tableName: string
@@ -13,11 +15,32 @@ interface Props {
 
 export function RelatedTable({ tableName, column, count, rows, onAdd }: Props) {
   const navigate = useNavigate()
+  const { tenantId, selectedDb } = useTenant()
   const [expanded, setExpanded] = useState(count <= 20)
+  const [viewConfig, setViewConfig] = useState<ViewDef | null>(null)
 
-  const displayCols = rows.length > 0
-    ? Object.keys(rows[0]).filter(k => k !== column && !k.endsWith('__display')).slice(0, 5)
-    : []
+  // Fetch the child table's view config for column visibility/order
+  useEffect(() => {
+    if (!tenantId || !selectedDb) return
+    api.get<{ views: ViewDef[] }>(
+      `/tenants/${tenantId}/databases/${selectedDb.id}/tables/${tableName}/views?default=true`
+    )
+      .then(res => { if (res.views.length > 0) setViewConfig(res.views[0]) })
+      .catch(() => {})
+  }, [tenantId, selectedDb, tableName])
+
+  // Determine columns to display — use view config if available
+  let displayCols: string[]
+  if (viewConfig) {
+    displayCols = viewConfig.config.columns
+      .filter(c => c.visible && c.field !== column)
+      .map(c => c.field)
+      .slice(0, 6)
+  } else {
+    displayCols = rows.length > 0
+      ? Object.keys(rows[0]).filter(k => k !== column && !k.endsWith('__display')).slice(0, 5)
+      : []
+  }
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
