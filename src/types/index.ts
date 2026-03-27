@@ -97,6 +97,7 @@ export interface FormRelatedConfig {
   reference_column: string
   visible: boolean
   collapsed: boolean
+  view_id?: string | null
 }
 
 export interface FormConfig {

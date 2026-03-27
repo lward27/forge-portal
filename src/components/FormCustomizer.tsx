@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Eye, EyeOff, GripVertical } from 'lucide-react'
 import { SlideOutPanel } from './SlideOutPanel'
-import type { FormConfig, FormFieldConfig, FormRelatedConfig } from '../types'
+import { api } from '../api/client'
+import { useTenant } from '../context/TenantContext'
+import type { FormConfig, FormFieldConfig, FormRelatedConfig, ViewDef } from '../types'
 
 interface Props {
   open: boolean
@@ -9,10 +11,13 @@ interface Props {
   config: FormConfig
   onSave: (config: FormConfig) => void
   onSaveAsNew?: (name: string, config: FormConfig) => void
+  tableName?: string
 }
 
-export function FormCustomizer({ open, onClose, config, onSave, onSaveAsNew }: Props) {
+export function FormCustomizer({ open, onClose, config, onSave, onSaveAsNew, tableName }: Props) {
+  const { tenantId, selectedDb } = useTenant()
   const [newFormName, setNewFormName] = useState('')
+  const [relatedViews, setRelatedViews] = useState<Record<string, ViewDef[]>>({})
   const [showSaveAs, setShowSaveAs] = useState(false)
   const [sections, setSections] = useState(config.sections.map(s => ({
     ...s,
@@ -20,6 +25,24 @@ export function FormCustomizer({ open, onClose, config, onSave, onSaveAsNew }: P
   })))
   const [related, setRelated] = useState<FormRelatedConfig[]>([...config.related_tables])
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+
+  // Fetch available views for each related table
+  useEffect(() => {
+    if (!open || !tenantId || !selectedDb) return
+    const tables = config.related_tables.map(r => r.table)
+    const unique = [...new Set(tables)]
+    unique.forEach(t => {
+      api.get<{ views: ViewDef[] }>(`/tenants/${tenantId}/databases/${selectedDb.id}/tables/${t}/views`)
+        .then(res => setRelatedViews(prev => ({ ...prev, [t]: res.views })))
+        .catch(() => {})
+    })
+  }, [open, tenantId, selectedDb, config.related_tables])
+
+  function setRelatedViewId(i: number, viewId: string | null) {
+    const next = [...related]
+    next[i] = { ...next[i], view_id: viewId }
+    setRelated(next)
+  }
 
   function toggleField(sectionIdx: number, fieldIdx: number) {
     const next = sections.map((s, si) => si === sectionIdx ? {
@@ -97,17 +120,34 @@ export function FormCustomizer({ open, onClose, config, onSave, onSaveAsNew }: P
             <h3 className="text-sm font-medium text-gray-700 mb-2">Related Tables</h3>
             <div className="space-y-2">
               {related.map((rel, i) => (
-                <div key={`${rel.table}-${rel.reference_column}`} className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-md">
-                  <span className="text-sm text-gray-900">{rel.table}</span>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                      <input type="checkbox" checked={rel.collapsed} onChange={() => toggleRelatedCollapsed(i)} className="rounded" />
-                      Collapsed
-                    </label>
-                    <button type="button" onClick={() => toggleRelated(i)} className="text-gray-400 hover:text-gray-600">
-                      {rel.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                    </button>
+                <div key={`${rel.table}-${rel.reference_column}`} className="px-3 py-2 bg-white border border-gray-200 rounded-md space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">{rel.table}</span>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                        <input type="checkbox" checked={rel.collapsed} onChange={() => toggleRelatedCollapsed(i)} className="rounded" />
+                        Collapsed
+                      </label>
+                      <button type="button" onClick={() => toggleRelated(i)} className="text-gray-400 hover:text-gray-600">
+                        {rel.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                      </button>
+                    </div>
                   </div>
+                  {rel.visible && relatedViews[rel.table] && relatedViews[rel.table].length > 0 && (
+                    <div>
+                      <label className="text-xs text-gray-500">View</label>
+                      <select
+                        value={rel.view_id || ''}
+                        onChange={(e) => setRelatedViewId(i, e.target.value || null)}
+                        className="w-full mt-1 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Default View</option>
+                        {relatedViews[rel.table].filter(v => !v.is_default).map(v => (
+                          <option key={v.id} value={v.id}>{v.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

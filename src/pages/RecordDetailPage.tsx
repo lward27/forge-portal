@@ -228,6 +228,9 @@ export function RecordDetailPage() {
               count={group.count}
               rows={group.rows}
               onAdd={() => openAddChild(group.table, group.column)}
+              viewId={formDef?.config?.related_tables?.find(
+                r => r.table === group.table && r.reference_column === group.column
+              )?.view_id}
             />
           ))}
         </div>
@@ -266,6 +269,7 @@ export function RecordDetailPage() {
           open={showFormCustomizer}
           onClose={() => setShowFormCustomizer(false)}
           config={formDef.config}
+          tableName={tableName}
           onSave={async (newConfig) => {
             try {
               await api.put(`${basePath}/forms/${formDef.id}`, { config: newConfig })

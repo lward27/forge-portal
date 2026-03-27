@@ -11,23 +11,32 @@ interface Props {
   count: number
   rows: RowData[]
   onAdd: () => void
+  viewId?: string | null
 }
 
-export function RelatedTable({ tableName, column, count, rows, onAdd }: Props) {
+export function RelatedTable({ tableName, column, count, rows, onAdd, viewId }: Props) {
   const navigate = useNavigate()
   const { tenantId, selectedDb } = useTenant()
   const [expanded, setExpanded] = useState(count <= 20)
   const [viewConfig, setViewConfig] = useState<ViewDef | null>(null)
 
-  // Fetch the child table's view config for column visibility/order
+  // Fetch the view config — use specific viewId if provided, otherwise default
   useEffect(() => {
     if (!tenantId || !selectedDb) return
-    api.get<{ views: ViewDef[] }>(
-      `/tenants/${tenantId}/databases/${selectedDb.id}/tables/${tableName}/views?default=true`
-    )
-      .then(res => { if (res.views.length > 0) setViewConfig(res.views[0]) })
-      .catch(() => {})
-  }, [tenantId, selectedDb, tableName])
+    if (viewId) {
+      api.get<ViewDef>(
+        `/tenants/${tenantId}/databases/${selectedDb.id}/tables/${tableName}/views/${viewId}`
+      )
+        .then(res => setViewConfig(res))
+        .catch(() => {})
+    } else {
+      api.get<{ views: ViewDef[] }>(
+        `/tenants/${tenantId}/databases/${selectedDb.id}/tables/${tableName}/views?default=true`
+      )
+        .then(res => { if (res.views.length > 0) setViewConfig(res.views[0]) })
+        .catch(() => {})
+    }
+  }, [tenantId, selectedDb, tableName, viewId])
 
   // Determine columns to display — use view config if available
   let displayCols: string[]
