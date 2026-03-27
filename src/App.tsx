@@ -11,6 +11,7 @@ import { GettingStartedPage } from './pages/GettingStartedPage'
 import { DataViewPage } from './pages/DataViewPage'
 import { SchemaBuilderPage } from './pages/SchemaBuilderPage'
 import { RecordDetailPage } from './pages/RecordDetailPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { api } from './api/client'
 import { FIELD_TYPES, TYPE_LABELS } from './types'
 
@@ -75,7 +76,7 @@ function PortalRoutes() {
     <>
       <Layout onLogout={logout} onNewTable={() => setShowNewTable(true)}>
         <Routes>
-          <Route path="/" element={<GettingStartedPage />} />
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/tables/:tableName" element={<DataViewPage />} />
           <Route path="/tables/:tableName/settings" element={<SchemaBuilderPage />} />
           <Route path="/tables/:tableName/records/:recordId" element={<RecordDetailPage />} />

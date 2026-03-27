@@ -112,3 +112,31 @@ export interface FormDef {
   is_default: boolean
   config: FormConfig
 }
+
+// Dashboard types
+export interface DashboardWidget {
+  id: string
+  type: 'view' | 'form' | 'stat'
+  title: string
+  table: string
+  view_id?: string | null
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface DashboardConfig {
+  widgets: DashboardWidget[]
+  grid_cols: number
+}
+
+export interface DashboardDef {
+  id: string
+  database_id: string
+  name: string
+  is_default: boolean
+  config: DashboardConfig
+  created_at: string
+  updated_at: string | null
+}
