@@ -124,16 +124,29 @@ export function DashboardPage() {
 
   if (!current) {
     return (
-      <EmptyState
-        icon={<LayoutDashboard size={48} />}
-        title="No dashboards yet"
-        description="Create a dashboard to build your custom workspace with views, forms, and stats."
-        action={
-          <button onClick={() => setShowCreateDash(true)} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
-            Create Dashboard
-          </button>
-        }
-      />
+      <>
+        <EmptyState
+          icon={<LayoutDashboard size={48} />}
+          title="No dashboards yet"
+          description="Create a dashboard to build your custom workspace with views, forms, and stats."
+          action={
+            <button onClick={() => setShowCreateDash(true)} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
+              Create Dashboard
+            </button>
+          }
+        />
+        <Modal title="New Dashboard" open={showCreateDash} onClose={() => setShowCreateDash(false)}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Dashboard Name</label>
+            <input value={newDashName} onChange={(e) => setNewDashName(e.target.value)} placeholder="Sales Overview"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" autoFocus />
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
+            <button onClick={() => setShowCreateDash(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md">Cancel</button>
+            <button onClick={handleCreateDash} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">Create</button>
+          </div>
+        </Modal>
+      </>
     )
   }
 
