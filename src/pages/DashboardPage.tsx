@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 import { useToast } from '../components/ToastProvider'
 import { DashboardWidgetWrapper } from '../components/DashboardWidget'
+import { DashboardGrid } from '../components/DashboardGrid'
 import { ViewWidget } from '../components/ViewWidget'
 import { FormWidget } from '../components/FormWidget'
 import { StatWidget } from '../components/StatWidget'
@@ -227,22 +228,25 @@ export function DashboardPage() {
           <button onClick={() => setShowAddWidget(true)} className="text-sm text-blue-600 hover:text-blue-700">+ Add your first widget</button>
         </div>
       ) : (
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(12, 1fr)', gridAutoRows: '80px' }}>
-          {widgets.map(widget => (
+        <DashboardGrid
+          widgets={widgets}
+          editing={editing}
+          onLayoutChange={(updatedWidgets) => {
+            const newConfig = { ...current.config, widgets: updatedWidgets }
+            setCurrent({ ...current, config: newConfig })
+          }}
+          renderWidget={(widget) => (
             <DashboardWidgetWrapper
-              key={widget.id}
               widget={widget}
               editing={editing}
               onRemove={() => removeWidget(widget.id)}
-              onResize={(w, h) => updateWidget(widget.id, { w, h })}
-              onMove={(x, y) => updateWidget(widget.id, { x, y })}
             >
               {widget.type === 'view' && <ViewWidget key={refreshKey} table={widget.table} viewId={widget.view_id} />}
               {widget.type === 'form' && <FormWidget table={widget.table} onSaved={() => setRefreshKey(k => k + 1)} />}
               {widget.type === 'stat' && <StatWidget key={refreshKey} table={widget.table} />}
             </DashboardWidgetWrapper>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       <AddWidgetDialog open={showAddWidget} onClose={() => setShowAddWidget(false)} onAdd={addWidget} />
