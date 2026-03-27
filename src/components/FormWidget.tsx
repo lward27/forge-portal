@@ -7,9 +7,10 @@ import type { TableDef, ColumnDef } from '../types'
 
 interface Props {
   table: string
+  onSaved?: () => void
 }
 
-export function FormWidget({ table }: Props) {
+export function FormWidget({ table, onSaved }: Props) {
   const { tenantId, selectedDb } = useTenant()
   const { toast } = useToast()
   const [tableDef, setTableDef] = useState<TableDef | null>(null)
@@ -42,6 +43,7 @@ export function FormWidget({ table }: Props) {
       await api.post(`/tenants/${tenantId}/databases/${selectedDb.id}/tables/${table}/rows`, formData)
       toast('Record created', 'success')
       resetForm(tableDef.columns)
+      onSaved?.()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed'
       setError(msg)

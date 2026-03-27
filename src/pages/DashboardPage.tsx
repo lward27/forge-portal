@@ -20,6 +20,7 @@ export function DashboardPage() {
   const [dashboards, setDashboards] = useState<DashboardDef[]>([])
   const [current, setCurrent] = useState<DashboardDef | null>(null)
   const [editing, setEditing] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [showAddWidget, setShowAddWidget] = useState(false)
   const [showCreateDash, setShowCreateDash] = useState(false)
   const [newDashName, setNewDashName] = useState('')
@@ -56,23 +57,42 @@ export function DashboardPage() {
     }
   }
 
+  function findAvailablePosition(widgets: DashboardWidget[], w: number, h: number): { x: number; y: number } {
+    const cols = 12
+    for (let row = 0; row < 100; row++) {
+      for (let col = 0; col <= cols - w; col++) {
+        const fits = !widgets.some(wd =>
+          col < wd.x + wd.w && col + w > wd.x && row < wd.y + wd.h && row + h > wd.y
+        )
+        if (fits) return { x: col, y: row }
+      }
+    }
+    return { x: 0, y: widgets.reduce((max, wd) => Math.max(max, wd.y + wd.h), 0) }
+  }
+
   function addWidget(partial: Omit<DashboardWidget, 'id' | 'x' | 'y'>) {
     if (!current) return
     const widgets = current.config.widgets || []
-
-    // Find next available y position
-    const maxY = widgets.reduce((max, w) => Math.max(max, w.y + w.h), 0)
+    const pos = findAvailablePosition(widgets, partial.w, partial.h)
 
     const widget: DashboardWidget = {
       ...partial,
       id: `w${Date.now()}`,
-      x: 0,
-      y: maxY,
+      ...pos,
     }
 
     const newConfig = { ...current.config, widgets: [...widgets, widget] }
     setCurrent({ ...current, config: newConfig })
     saveDashboard(newConfig)
+  }
+
+  function updateWidget(widgetId: string, updates: Partial<DashboardWidget>) {
+    if (!current) return
+    const newWidgets = current.config.widgets.map(w =>
+      w.id === widgetId ? { ...w, ...updates } : w
+    )
+    const newConfig = { ...current.config, widgets: newWidgets }
+    setCurrent({ ...current, config: newConfig })
   }
 
   function removeWidget(widgetId: string) {
@@ -214,13 +234,12 @@ export function DashboardPage() {
               widget={widget}
               editing={editing}
               onRemove={() => removeWidget(widget.id)}
-              onDragStart={() => {}}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {}}
+              onResize={(w, h) => updateWidget(widget.id, { w, h })}
+              onMove={(x, y) => updateWidget(widget.id, { x, y })}
             >
-              {widget.type === 'view' && <ViewWidget table={widget.table} viewId={widget.view_id} />}
-              {widget.type === 'form' && <FormWidget table={widget.table} />}
-              {widget.type === 'stat' && <StatWidget table={widget.table} />}
+              {widget.type === 'view' && <ViewWidget key={refreshKey} table={widget.table} viewId={widget.view_id} />}
+              {widget.type === 'form' && <FormWidget table={widget.table} onSaved={() => setRefreshKey(k => k + 1)} />}
+              {widget.type === 'stat' && <StatWidget key={refreshKey} table={widget.table} />}
             </DashboardWidgetWrapper>
           ))}
         </div>
