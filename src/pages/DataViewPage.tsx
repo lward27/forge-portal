@@ -419,8 +419,10 @@ export function DataViewPage() {
             try {
               const res = await api.post<ViewDef>(`${basePath}/views`, { name, config: newConfig })
               toast(`View "${name}" created`, 'success')
+              // Directly update state — don't rely on stale searchParams in loadData
+              setAllViews(prev => [...prev, res])
+              setViewDef(res)
               setSearchParams({ view: res.id })
-              loadData()
             } catch (err) {
               toast(err instanceof Error ? err.message : 'Failed to create view', 'error')
             }

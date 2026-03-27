@@ -279,8 +279,9 @@ export function RecordDetailPage() {
             try {
               const res = await api.post<FormDef>(`${basePath}/forms`, { name, config: newConfig })
               toast(`Form "${name}" created`, 'success')
+              setAllForms(prev => [...prev, res])
+              setFormDef(res)
               setSearchParams({ form: res.id })
-              loadRecord()
             } catch (err) {
               toast(err instanceof Error ? err.message : 'Failed to create form', 'error')
             }
