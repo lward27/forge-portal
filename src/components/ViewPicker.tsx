@@ -21,7 +21,7 @@ export function ViewPicker({ views, selected, onSelect, onDelete }: Props) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  if (views.length <= 1) return null
+  if (views.length === 0) return null
 
   return (
     <div ref={ref} className="relative">

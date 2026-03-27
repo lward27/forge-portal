@@ -21,7 +21,7 @@ export function FormPicker({ forms, selected, onSelect, onDelete }: Props) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  if (forms.length <= 1) return null
+  if (forms.length === 0) return null
 
   return (
     <div ref={ref} className="relative">
