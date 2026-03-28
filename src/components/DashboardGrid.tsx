@@ -72,7 +72,7 @@ export function DashboardGrid({ widgets, editing, onLayoutChange, renderWidget }
         margin={[16, 16] as [number, number]}
       >
         {widgets.map(widget => (
-          <div key={widget.id}>
+          <div key={widget.id} style={{ height: '100%' }}>
             {renderWidget(widget)}
           </div>
         ))}

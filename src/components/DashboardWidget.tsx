@@ -26,7 +26,10 @@ export function DashboardWidgetWrapper({ widget, editing, onRemove, children }: 
           </span>
         </div>
         {editing && (
-          <button onClick={onRemove} className="text-gray-400 hover:text-red-600 shrink-0">
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); onRemove(); }}
+            className="text-gray-400 hover:text-red-600 shrink-0 relative z-10"
+          >
             <X size={14} />
           </button>
         )}

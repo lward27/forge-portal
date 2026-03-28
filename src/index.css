@@ -6,15 +6,28 @@
 @import 'react-grid-layout/css/styles.css';
 @import 'react-resizable/css/styles.css';
 
-/* Resize handle: visible above widget content */
+/* Grid item children fill the item */
+.react-grid-item > div {
+  height: 100%;
+}
+
+/* Resize handle: visible, large hit target, above everything */
 .react-grid-item > .react-resizable-handle {
-  z-index: 10;
+  z-index: 20;
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
 }
 .react-grid-item > .react-resizable-handle::after {
-  border-right: 2px solid rgba(0, 0, 0, 0.3) !important;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.3) !important;
-  width: 8px !important;
-  height: 8px !important;
+  content: '';
+  position: absolute;
+  border-right: 3px solid rgba(59, 130, 246, 0.6) !important;
+  border-bottom: 3px solid rgba(59, 130, 246, 0.6) !important;
+  width: 10px !important;
+  height: 10px !important;
   right: 4px !important;
   bottom: 4px !important;
 }
