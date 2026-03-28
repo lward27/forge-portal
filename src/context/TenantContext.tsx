@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { api } from '../api/client'
 import type { AuthMe, Database } from '../types'
 
@@ -9,6 +9,8 @@ interface TenantContextType {
   selectedDb: Database | null
   selectDb: (db: Database) => void
   refreshDatabases: () => Promise<void>
+  refreshKey: number
+  triggerRefresh: () => void
   loading: boolean
 }
 
@@ -19,6 +21,8 @@ const TenantContext = createContext<TenantContextType>({
   selectedDb: null,
   selectDb: () => {},
   refreshDatabases: async () => {},
+  refreshKey: 0,
+  triggerRefresh: () => {},
   loading: true,
 })
 
@@ -27,6 +31,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [databases, setDatabases] = useState<Database[]>([])
   const [selectedDb, setSelectedDb] = useState<Database | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const tenantId = me?.tenant_id || null
 
@@ -66,9 +71,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const triggerRefresh = useCallback(() => {
+    setRefreshKey(k => k + 1)
+  }, [])
+
   return (
     <TenantContext.Provider value={{
-      me, tenantId, databases, selectedDb, selectDb: setSelectedDb, refreshDatabases, loading,
+      me, tenantId, databases, selectedDb, selectDb: setSelectedDb,
+      refreshDatabases, refreshKey, triggerRefresh, loading,
     }}>
       {children}
     </TenantContext.Provider>

@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function TableSidebar({ onNewTable }: Props) {
-  const { tenantId, databases, selectedDb, selectDb } = useTenant()
+  const { tenantId, databases, selectedDb, selectDb, refreshKey } = useTenant()
   const [tables, setTables] = useState<TableDef[]>([])
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export function TableSidebar({ onNewTable }: Props) {
     } else {
       setTables([])
     }
-  }, [tenantId, selectedDb])
+  }, [tenantId, selectedDb, refreshKey])
 
   return (
     <aside className="fixed left-0 top-14 bottom-0 w-56 bg-white border-r border-gray-200 flex flex-col">

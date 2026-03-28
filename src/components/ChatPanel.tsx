@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function ChatPanel({ open, onClose }: Props) {
-  const { tenantId, selectedDb } = useTenant()
+  const { tenantId, selectedDb, triggerRefresh } = useTenant()
   const navigate = useNavigate()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -55,6 +55,11 @@ export function ChatPanel({ open, onClose }: Props) {
         content: res.response,
         actions: res.actions_taken,
       }])
+
+      // Refresh UI if AI made any changes
+      if (res.actions_taken && res.actions_taken.length > 0) {
+        triggerRefresh()
+      }
 
       // Check for navigation actions
       const navAction = res.actions_taken?.find(a => a.tool === 'navigate')
