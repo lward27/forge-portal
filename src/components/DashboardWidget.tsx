@@ -14,7 +14,7 @@ export function DashboardWidgetWrapper({ widget, editing, onRemove, children }: 
   const navigate = useNavigate()
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full ${editing ? 'ring-2 ring-blue-200' : ''}`}>
+    <div className={`bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col h-full ${editing ? 'ring-2 ring-blue-200 overflow-visible' : 'overflow-hidden'}`}>
       <div className={`flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50 shrink-0 ${editing ? 'widget-drag-handle cursor-move' : ''}`}>
         <div className="flex items-center gap-2 min-w-0">
           {editing && <GripVertical size={14} className="text-gray-300 shrink-0" />}

@@ -5,3 +5,16 @@
 /* react-grid-layout */
 @import 'react-grid-layout/css/styles.css';
 @import 'react-resizable/css/styles.css';
+
+/* Resize handle: visible above widget content */
+.react-grid-item > .react-resizable-handle {
+  z-index: 10;
+}
+.react-grid-item > .react-resizable-handle::after {
+  border-right: 2px solid rgba(0, 0, 0, 0.3) !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3) !important;
+  width: 8px !important;
+  height: 8px !important;
+  right: 4px !important;
+  bottom: 4px !important;
+}
