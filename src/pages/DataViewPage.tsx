@@ -22,7 +22,7 @@ export function DataViewPage() {
   const { tableName } = useParams<{ tableName: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { tenantId, selectedDb } = useTenant()
+  const { tenantId, selectedDb, refreshKey: globalRefreshKey } = useTenant()
   const { toast } = useToast()
 
   const [tableDef, setTableDef] = useState<TableDef | null>(null)
@@ -99,7 +99,7 @@ export function DataViewPage() {
     } finally {
       setLoading(false)
     }
-  }, [tenantId, selectedDb, tableName, offset, sortCol, sortDesc, debouncedSearch, basePath])
+  }, [tenantId, selectedDb, tableName, offset, sortCol, sortDesc, debouncedSearch, basePath, globalRefreshKey])
 
   useEffect(() => { loadData() }, [loadData])
 
