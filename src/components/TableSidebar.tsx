@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Table2, Plus, ChevronDown, Bot, LayoutGrid } from 'lucide-react'
+import { Table2, Plus, ChevronDown, ChevronRight, Bot, LayoutGrid } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 import type { TableDef, Database } from '../types'
@@ -12,6 +12,16 @@ interface Props {
 export function TableSidebar({ onNewTable }: Props) {
   const { tenantId, databases, selectedDb, selectDb, refreshKey } = useTenant()
   const [tables, setTables] = useState<TableDef[]>([])
+  const [collapsedApps, setCollapsedApps] = useState<Set<string>>(new Set())
+
+  function toggleApp(app: string) {
+    setCollapsedApps(prev => {
+      const next = new Set(prev)
+      if (next.has(app)) next.delete(app)
+      else next.add(app)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (tenantId && selectedDb) {
@@ -46,24 +56,63 @@ export function TableSidebar({ onNewTable }: Props) {
       )}
 
       <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        <p className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wider">Tables</p>
-        {tables.map(t => (
-          <NavLink
-            key={t.name}
-            to={`/tables/${t.name}`}
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
-              }`
+        {(() => {
+          // Group tables by app
+          const apps: Record<string, TableDef[]> = {}
+          const ungrouped: TableDef[] = []
+          tables.forEach(t => {
+            if (t.app_name) {
+              (apps[t.app_name] = apps[t.app_name] || []).push(t)
+            } else {
+              ungrouped.push(t)
             }
-          >
-            <Table2 size={16} />
-            {t.name}
-          </NavLink>
-        ))}
-        {tables.length === 0 && selectedDb && (
-          <p className="px-3 py-4 text-sm text-gray-400 text-center">No tables yet</p>
-        )}
+          })
+          const appNames = Object.keys(apps).sort()
+          const hasApps = appNames.length > 0
+
+          return (
+            <>
+              {appNames.map(app => (
+                <div key={app}>
+                  <button onClick={() => toggleApp(app)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider w-full hover:text-gray-600 dark:hover:text-gray-300">
+                    {collapsedApps.has(app) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                    {app}
+                  </button>
+                  {!collapsedApps.has(app) && apps[app].map(t => (
+                    <NavLink key={t.name} to={`/tables/${t.name}`}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 px-3 pl-6 py-1.5 rounded-md text-sm transition-colors ${
+                          isActive ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`
+                      }>
+                      <Table2 size={14} /> {t.name}
+                    </NavLink>
+                  ))}
+                </div>
+              ))}
+              {ungrouped.length > 0 && (
+                <div>
+                  {hasApps && <p className="px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Ungrouped</p>}
+                  {!hasApps && <p className="px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Tables</p>}
+                  {ungrouped.map(t => (
+                    <NavLink key={t.name} to={`/tables/${t.name}`}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                          isActive ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`
+                      }>
+                      <Table2 size={14} /> {t.name}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              {tables.length === 0 && selectedDb && (
+                <p className="px-3 py-4 text-sm text-gray-400 dark:text-gray-500 text-center">No tables yet</p>
+              )}
+            </>
+          )
+        })()}
       </nav>
 
       {selectedDb && (
