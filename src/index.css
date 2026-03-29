@@ -47,7 +47,7 @@
   height: 100%;
 }
 
-/* Resize handle: visible, large hit target, above everything */
+/* Resize handle: only visible via react-grid-layout when isResizable=true */
 .react-grid-item > .react-resizable-handle {
   z-index: 20;
   position: absolute;
@@ -66,4 +66,9 @@
   height: 10px !important;
   right: 4px !important;
   bottom: 4px !important;
+}
+/* Hide the handle when grid is static (view mode) */
+.react-grid-item.static > .react-resizable-handle,
+.react-grid-item.css-static > .react-resizable-handle {
+  display: none !important;
 }
