@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Table2, Plus, ChevronDown } from 'lucide-react'
+import { Table2, Plus, ChevronDown, Bot, LayoutGrid } from 'lucide-react'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 import type { TableDef, Database } from '../types'
@@ -24,7 +24,7 @@ export function TableSidebar({ onNewTable }: Props) {
   }, [tenantId, selectedDb, refreshKey])
 
   return (
-    <aside className="fixed left-0 top-14 bottom-0 w-56 bg-white border-r border-gray-200 flex flex-col">
+    <aside className="fixed left-0 top-14 bottom-0 w-56 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {databases.length > 1 && (
         <div className="p-3 border-b border-gray-200">
           <div className="relative">
@@ -67,15 +67,28 @@ export function TableSidebar({ onNewTable }: Props) {
       </nav>
 
       {selectedDb && (
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700 space-y-1">
           <button
             onClick={onNewTable}
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
+            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50"
           >
             <Plus size={16} /> New Table
           </button>
         </div>
       )}
+
+      <div className="p-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
+        <NavLink to="/templates" className={({ isActive }) =>
+          `flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`
+        }>
+          <LayoutGrid size={16} /> Templates
+        </NavLink>
+        <NavLink to="/chat" className={({ isActive }) =>
+          `flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`
+        }>
+          <Bot size={16} /> AI Chat
+        </NavLink>
+      </div>
     </aside>
   )
 }

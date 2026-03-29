@@ -12,6 +12,9 @@ import { DataViewPage } from './pages/DataViewPage'
 import { SchemaBuilderPage } from './pages/SchemaBuilderPage'
 import { RecordDetailPage } from './pages/RecordDetailPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ChatPage } from './pages/ChatPage'
+import { TemplatePage } from './pages/TemplatePage'
+import { useTheme } from './hooks/useTheme'
 import { api } from './api/client'
 import { FIELD_TYPES, TYPE_LABELS } from './types'
 
@@ -19,6 +22,7 @@ function PortalRoutes() {
   const { logout } = useAuth()
   const { tenantId, selectedDb } = useTenant()
   const navigate = useNavigate()
+  const { dark, toggle: toggleTheme } = useTheme()
 
   // New table dialog state
   const [showNewTable, setShowNewTable] = useState(false)
@@ -74,12 +78,15 @@ function PortalRoutes() {
 
   return (
     <>
-      <Layout onLogout={logout} onNewTable={() => setShowNewTable(true)}>
+      <Layout onLogout={logout} onNewTable={() => setShowNewTable(true)} dark={dark} onToggleTheme={toggleTheme}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/tables/:tableName" element={<DataViewPage />} />
           <Route path="/tables/:tableName/settings" element={<SchemaBuilderPage />} />
           <Route path="/tables/:tableName/records/:recordId" element={<RecordDetailPage />} />
+          <Route path="/templates" element={<TemplatePage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat/:conversationId" element={<ChatPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

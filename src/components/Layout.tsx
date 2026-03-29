@@ -8,14 +8,16 @@ interface Props {
   children: ReactNode
   onLogout: () => void
   onNewTable: () => void
+  dark: boolean
+  onToggleTheme: () => void
 }
 
-export function Layout({ children, onLogout, onNewTable }: Props) {
+export function Layout({ children, onLogout, onNewTable, dark, onToggleTheme }: Props) {
   const [chatOpen, setChatOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopBar onLogout={onLogout} />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <TopBar onLogout={onLogout} dark={dark} onToggleTheme={onToggleTheme} />
       <TableSidebar onNewTable={onNewTable} />
       <main className="ml-56 mt-14 p-6">{children}</main>
 
