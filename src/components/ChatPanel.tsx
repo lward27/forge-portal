@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, Send, MessageSquare, Bot, User, Loader2 } from 'lucide-react'
+import Markdown from 'react-markdown'
 import { api } from '../api/client'
 import { useTenant } from '../context/TenantContext'
 
@@ -134,7 +135,9 @@ export function ChatPanel({ open, onClose }: Props) {
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-800'
               }`}>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_code]:bg-gray-200/50 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-gray-800 [&_pre]:text-gray-100 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-xs [&_pre]:overflow-x-auto">
+                  <Markdown>{msg.content}</Markdown>
+                </div>
                 {msg.actions && msg.actions.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-gray-200/50 space-y-1">
                     {msg.actions.map((a, j) => (
