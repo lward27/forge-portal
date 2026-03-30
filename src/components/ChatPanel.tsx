@@ -25,18 +25,18 @@ export function ChatPanel({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [hitLimit, setHitLimit] = useState(false)
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  async function handleSend() {
-    if (!input.trim() || !tenantId || !selectedDb || loading) return
-    const userMsg = input.trim()
-    setInput('')
+  async function sendMessage(userMsg: string) {
+    if (!tenantId || !selectedDb || loading) return
     setError('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    setHitLimit(false)
     setLoading(true)
 
     try {
@@ -44,6 +44,7 @@ export function ChatPanel({ open, onClose }: Props) {
         conversation_id: string
         response: string
         actions_taken: { tool: string; args: Record<string, unknown>; result: string }[]
+        hit_tool_limit: boolean
       }>('/ai/chat', {
         tenant_id: tenantId,
         database_id: selectedDb.id,
@@ -58,13 +59,12 @@ export function ChatPanel({ open, onClose }: Props) {
         content: res.response,
         actions: res.actions_taken,
       }])
+      setHitLimit(res.hit_tool_limit)
 
-      // Refresh UI if AI made any changes
       if (res.actions_taken && res.actions_taken.length > 0) {
         triggerRefresh()
       }
 
-      // Check for navigation actions
       const navAction = res.actions_taken?.find(a => a.tool === 'navigate')
       if (navAction && navAction.args?.path) {
         navigate(navAction.args.path as string)
@@ -76,6 +76,24 @@ export function ChatPanel({ open, onClose }: Props) {
     }
   }
 
+  function handleSend() {
+    if (!input.trim()) return
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    sendMessage(userMsg)
+  }
+
+  function handleContinue() {
+    const continueMsg = 'Please continue where you left off.'
+    setMessages(prev => [...prev, { role: 'user', content: continueMsg }])
+    sendMessage(continueMsg)
+  }
+
+  function handleStop() {
+    setHitLimit(false)
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -85,6 +103,7 @@ export function ChatPanel({ open, onClose }: Props) {
 
   function newConversation() {
     setMessages([])
+    setHitLimit(false)
     setConversationId(null)
     setError('')
   }
@@ -166,6 +185,18 @@ export function ChatPanel({ open, onClose }: Props) {
 
           {error && (
             <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>
+          )}
+
+          {hitLimit && !loading && (
+            <div className="flex items-center justify-center gap-2 py-2">
+              <button onClick={handleContinue} className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                Continue
+              </button>
+              <button onClick={handleStop} className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300">
+                Stop
+              </button>
+              <span className="text-xs text-gray-400">AI reached its action limit</span>
+            </div>
           )}
 
           <div ref={messagesEndRef} />

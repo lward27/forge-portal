@@ -37,6 +37,7 @@ export function ChatPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [hitLimit, setHitLimit] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { loadConversations() }, [tenantId, selectedDb])
@@ -70,19 +71,18 @@ export function ChatPage() {
     loadConversations()
   }
 
-  async function handleSend() {
-    if (!input.trim() || !tenantId || !selectedDb || loading) return
-    const userMsg = input.trim()
-    setInput('')
+  async function sendMessage(userMsg: string) {
+    if (!tenantId || !selectedDb || loading) return
     setError('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    setHitLimit(false)
     setLoading(true)
 
     try {
       const res = await api.post<{
         conversation_id: string
         response: string
-        actions_taken: { tool: string }[]
+        actions_taken: { tool: string; args?: Record<string, unknown>; result?: string }[]
+        hit_tool_limit: boolean
       }>('/ai/chat', {
         tenant_id: tenantId,
         database_id: selectedDb.id,
@@ -91,7 +91,8 @@ export function ChatPage() {
       })
 
       setActiveId(res.conversation_id)
-      setMessages(prev => [...prev, { role: 'assistant', content: res.response }])
+      setMessages(prev => [...prev, { role: 'assistant', content: res.response, actions: res.actions_taken }])
+      setHitLimit(res.hit_tool_limit)
 
       if (res.actions_taken?.length > 0) triggerRefresh()
       loadConversations()
@@ -105,6 +106,24 @@ export function ChatPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleSend() {
+    if (!input.trim()) return
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    sendMessage(userMsg)
+  }
+
+  function handleContinue() {
+    const continueMsg = 'Please continue where you left off.'
+    setMessages(prev => [...prev, { role: 'user', content: continueMsg }])
+    sendMessage(continueMsg)
+  }
+
+  function handleStop() {
+    setHitLimit(false)
   }
 
   function getTitle(c: ConversationSummary) {
@@ -197,6 +216,19 @@ export function ChatPage() {
           )}
 
           {error && <div className="text-xs text-red-600 bg-red-50 dark:bg-red-900/30 px-3 py-2 rounded">{error}</div>}
+
+          {hitLimit && !loading && (
+            <div className="flex items-center justify-center gap-3 py-3">
+              <button onClick={handleContinue} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                Continue
+              </button>
+              <button onClick={handleStop} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                Stop
+              </button>
+              <span className="text-xs text-gray-400 dark:text-gray-500">AI reached its action limit — click Continue to keep going</span>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
