@@ -9,6 +9,7 @@ import { useToast } from '../components/ToastProvider'
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  actions?: { tool: string; args?: Record<string, unknown>; result?: string }[]
 }
 
 interface ConversationSummary {
@@ -170,6 +171,16 @@ export function ChatPage() {
                 <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_code]:bg-gray-200/50 dark:[&_code]:bg-gray-700/50 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-gray-800 [&_pre]:text-gray-100 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-xs">
                   <Markdown>{msg.content}</Markdown>
                 </div>
+                {msg.actions && msg.actions.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-gray-200/30 dark:border-gray-600/30 space-y-1">
+                    {msg.actions.map((a, j) => (
+                      <div key={j} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        <span className="font-mono bg-gray-200/50 dark:bg-gray-700/50 px-1 rounded">{a.tool}</span>
+                        <span className={a.result === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}>{a.result || 'done'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               {msg.role === 'user' && <User size={20} className="text-gray-400 shrink-0 mt-1" />}
             </div>
