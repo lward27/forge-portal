@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { X, Send, MessageSquare, Bot, User, Loader2 } from 'lucide-react'
 import Markdown from 'react-markdown'
 import { api } from '../api/client'
@@ -19,6 +19,7 @@ interface Props {
 export function ChatPanel({ open, onClose }: Props) {
   const { tenantId, selectedDb, triggerRefresh } = useTenant()
   const navigate = useNavigate()
+  const location = useLocation()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -48,6 +49,7 @@ export function ChatPanel({ open, onClose }: Props) {
         database_id: selectedDb.id,
         message: userMsg,
         conversation_id: conversationId,
+        page_context: location.pathname,
       })
 
       setConversationId(res.conversation_id)

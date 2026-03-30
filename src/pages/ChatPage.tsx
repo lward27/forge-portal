@@ -14,6 +14,7 @@ interface ChatMessage {
 
 interface ConversationSummary {
   id: string
+  title: string | null
   message_count: number
   created_at: string
   updated_at: string | null
@@ -107,7 +108,7 @@ export function ChatPage() {
   }
 
   function getTitle(c: ConversationSummary) {
-    return `Chat ${new Date(c.created_at).toLocaleDateString()}`
+    return c.title || `Chat ${new Date(c.created_at).toLocaleDateString()}`
   }
 
   return (
