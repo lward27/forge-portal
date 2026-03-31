@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Anvil, LogOut } from 'lucide-react'
+import { Anvil, LogOut, Bot } from 'lucide-react'
 import { useTenant } from '../context/TenantContext'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -7,9 +7,10 @@ interface Props {
   onLogout: () => void
   dark: boolean
   onToggleTheme: () => void
+  onOpenChat: () => void
 }
 
-export function TopBar({ onLogout, dark, onToggleTheme }: Props) {
+export function TopBar({ onLogout, dark, onToggleTheme, onOpenChat }: Props) {
   const { me, selectedDb } = useTenant()
   const navigate = useNavigate()
 
@@ -24,8 +25,11 @@ export function TopBar({ onLogout, dark, onToggleTheme }: Props) {
           <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">/ {selectedDb.name}</span>
         )}
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {me && <span className="text-sm text-gray-500 dark:text-gray-400">{me.tenant_name}</span>}
+        <button onClick={onOpenChat} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400" title="AI Assistant">
+          <Bot size={18} />
+        </button>
         <ThemeToggle dark={dark} onToggle={onToggleTheme} />
         <button onClick={onLogout} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Logout">
           <LogOut size={18} />
