@@ -21,13 +21,13 @@ export function Layout({ children, onLogout, onNewTable, dark, onToggleTheme }: 
       <TableSidebar onNewTable={onNewTable} />
       <main className="ml-56 mt-14 p-6">{children}</main>
 
-      {/* Chat toggle button */}
+      {/* Chat toggle button — semi-transparent, full opacity on hover */}
       <button
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center z-20 transition-transform hover:scale-105"
+        className="fixed bottom-6 right-6 w-10 h-10 bg-blue-600/40 text-white/60 rounded-full shadow-md hover:bg-blue-600 hover:text-white hover:w-14 hover:h-14 hover:shadow-lg flex items-center justify-center z-20 transition-all duration-200"
         title="AI Assistant"
       >
-        <Bot size={24} />
+        <Bot size={20} />
       </button>
 
       <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
